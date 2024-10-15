@@ -1,0 +1,117 @@
+Sub CreateFormattedCurrentCalendar()
+    Dim wsNextMonth As Worksheet
+    Dim wsNewCalendar As Worksheet
+    Dim currentMonth As Integer
+    Dim currentYear As Integer
+    Dim startDate As Date
+    Dim endDate As Date
+    Dim currentDate As Date
+    Dim dayOfWeek As Integer
+    Dim i As Integer
+    Dim rowOffset As Integer
+    Dim colOffset As Integer
+    Dim calendarSheetName As String
+    Dim rowIndex As Integer
+    Dim daysInWeek As Integer
+    Dim daysOfWeek As Variant
+
+    ' Set the worksheet with the next month's calendar (assuming it exists already)
+    Set wsNextMonth = ThisWorkbook.Sheets("CurrentMonthCalendar")
+
+    ' Determine the current month and year
+    currentMonth = Month(Date)
+    currentYear = Year(Date)
+
+    ' Generate the new sheet name in "mmmm yy" format
+    calendarSheetName = Format(DateSerial(currentYear, currentMonth, 1), "mmmm yy")
+
+    ' Delete existing worksheet if it exists
+    On Error Resume Next
+    Application.DisplayAlerts = False
+    ThisWorkbook.Sheets(calendarSheetName).Delete
+    Application.DisplayAlerts = True
+    On Error GoTo 0
+
+    ' Add new worksheet for the calendar view
+    Set wsNewCalendar = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.count))
+    wsNewCalendar.name = calendarSheetName
+
+    ' Set the headers
+    With wsNewCalendar
+        .Range("A1:G1").Merge
+        .Range("A2:G2").Merge
+        .Range("B3:G3").Merge
+        .Range("A1").Value = "Wrightsville Beach"
+        .Range("A2").Value = calendarSheetName
+        .Range("B3").Value = "Shift 1. 9:00 AM,                      Shift  2. 11:30 AM,                  Shift  3. 2:30 PM"
+        .Range("A1").Font.Bold = True
+        .Range("A2").Font.Bold = True
+        .Range("B3").Font.Bold = True
+        .Range("A1").Interior.Color = RGB(255, 215, 0) ' Gold color
+        .Range("A2").Interior.Color = RGB(37, 150, 190) ' Blue color
+        .Range("A1:A3").HorizontalAlignment = xlCenter
+        .Range("A1:A3").VerticalAlignment = xlCenter
+        .Range("A4:G4").Font.Bold = True
+        .Range("A4:G4").Interior.Color = RGB(192, 192, 192) ' Gray color for days of the week
+        .Range("B3:F3").VerticalAlignment = xlCenter
+        .Range("A1:G1").Font.Size = 22
+    End With
+
+    ' Output headers for days of the week
+    daysOfWeek = Array("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+    For i = 0 To 6
+        wsNewCalendar.Cells(4, i + 1).Value = daysOfWeek(i)
+    Next i
+
+    ' Set the start and end dates for the current month
+    startDate = DateSerial(currentYear, currentMonth, 1)
+    endDate = DateSerial(currentYear, currentMonth + 1, 0)
+
+    ' Start populating the calendar view
+    currentDate = startDate
+    rowOffset = 5 ' Start from the fifth row to leave space for headers
+    rowIndex = 2 ' Start from the second row in the NextMonthCalendar
+    daysInWeek = 1
+
+    Do While currentDate <= endDate
+        ' Calculate the column offset based on the day of the week
+        colOffset = Weekday(currentDate, vbSunday)
+
+        ' Output the date
+        wsNewCalendar.Cells(rowOffset, colOffset).Value = dateString
+
+        ' Output the data for the current month (assuming it's in the same format as NextMonthCalendar)
+        wsNewCalendar.Cells(rowOffset + 1, colOffset).Value = "1. " & wsNextMonth.Cells(rowIndex, 2).Value ' Column B
+        wsNewCalendar.Cells(rowOffset + 2, colOffset).Value = "2. " & wsNextMonth.Cells(rowIndex, 3).Value ' Column C
+        wsNewCalendar.Cells(rowOffset + 3, colOffset).Value = "3. " & wsNextMonth.Cells(rowIndex, 4).Value ' Column D
+
+        ' Move to the next day
+        currentDate = currentDate + 1
+        dateString = Format(currentDate, "dd")
+        rowIndex = rowIndex + 1
+        daysInWeek = daysInWeek + 1
+
+        ' Move to the next row if the week is complete
+        If colOffset = 7 Then
+            rowOffset = rowOffset + 6
+            daysInWeek = 1
+        End If
+    Loop
+
+    ' Autofit columns and rows
+    wsNewCalendar.Columns("A:G").AutoFit
+    wsNewCalendar.Rows("1:" & rowOffset).AutoFit
+        wsNewCalendar.Rows(5).Font.Bold = True
+    wsNewCalendar.Rows(11).Font.Bold = True
+    wsNewCalendar.Rows(17).Font.Bold = True
+    wsNewCalendar.Rows(23).Font.Bold = True
+    wsNewCalendar.Rows(29).Font.Bold = True
+    wsNewCalendar.Rows(5).HorizontalAlignment = xlLeft
+    wsNewCalendar.Rows(11).HorizontalAlignment = xlLeft
+    wsNewCalendar.Rows(17).HorizontalAlignment = xlLeft
+    wsNewCalendar.Rows(23).HorizontalAlignment = xlLeft
+    wsNewCalendar.Rows(29).HorizontalAlignment = xlLeft
+
+    MsgBox "Monthly calendar has been successfully created!"
+End Sub
+
