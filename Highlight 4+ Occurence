@@ -1,0 +1,52 @@
+Sub HighlightFrequentNames()
+    Dim ws As Worksheet
+    Dim nameRange As Range
+    Dim cell As Range
+    Dim nameDict As Object
+    Dim name As Variant
+    Dim count As Long
+    Dim firstAddress As String
+    Dim addressRange As String
+
+    ' Define the worksheet and range to scan
+    Set ws = ThisWorkbook.Sheets("NextMonthCalendar") ' Change "Sheet1" to your sheet name
+    Set nameRange = ws.Range("A2:D33") 'Change this range to your list of names
+
+    ' Create a dictionary to count occurrences
+    Set nameDict = CreateObject("Scripting.Dictionary")
+
+    ' Loop through each cell in the range
+    For Each cell In nameRange
+        If Not IsEmpty(cell.Value) Then
+            name = cell.Value
+            If nameDict.Exists(name) Then
+                nameDict(name) = nameDict(name) + 1
+            Else
+                nameDict.Add name, 1
+            End If
+        End If
+    Next cell
+
+    ' Highlight names with 4 or more occurrences
+    For Each name In nameDict.Keys
+        If nameDict(name) >= 4 Then
+            ' Find all cells with the name and highlight them
+            addressRange = ""
+            With nameRange
+                Set cell = .Find(name, LookIn:=xlValues, LookAt:=xlWhole)
+                If Not cell Is Nothing Then
+                    firstAddress = cell.Address
+                    Do
+                        addressRange = addressRange & cell.Address & ","
+                        Set cell = .FindNext(cell)
+                    Loop While Not cell Is Nothing And cell.Address <> firstAddress
+                    addressRange = Left(addressRange, Len(addressRange) - 1)
+                    ws.Range(addressRange).Interior.Color = RGB(255, 255, 0) ' Highlight in yellow
+                End If
+            End With
+        End If
+    Next name
+
+    MsgBox "Highlighting complete for names with 4 or more occurrences."
+End Sub
+
