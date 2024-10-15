@@ -1,0 +1,52 @@
+Sub GetNextMonthDAtes()
+    Dim ws As Worksheet
+    Dim rng As Range
+    Dim cell As Range
+    Dim nextMonth As Date
+    Dim startDate As Date
+    Dim endDate As Date
+    Dim dayOfWeek As Variant
+    Dim outputRow As Integer
+    Dim weekDays As Variant
+    Dim checkBoxCell As Range
+    Dim outputColumn As Integer
+    Dim dateCounter As Integer
+    
+    Set ws = ThisWorkbook.Sheets("Weekly Schedule") ' Ensure the correct sheet name
+    Set rng = ws.Range("A2:A" & ws.Cells(ws.Rows.count, "A").End(xlUp).Row) ' Adjust starting row as needed
+
+    ' Determine next month
+    nextMonth = DateAdd("m", 1, Date)
+    startDate = DateSerial(Year(nextMonth), Month(nextMonth), 1)
+    endDate = DateSerial(Year(nextMonth), Month(nextMonth) + 1, 0) ' Last day of next month
+
+    ' Define the weekdays corresponding to the checkboxes
+    weekDays = Array("M", "T", "W", "TH", "F", "S", "Sun")
+
+    ' Loop through each name in column A
+    For Each cell In rng
+        outputRow = cell.Row
+        ws.Cells(outputRow, 10).ClearContents ' Clear previous results in column J
+        dateCounter = 0 ' Reset date counter for each name
+        
+        ' Loop through each checkbox column (B to H)
+        For i = 1 To 7
+            If ws.Cells(outputRow, i + 1).Value = True Then ' Check if checkbox is checked
+                Dim currentDate As Date
+                currentDate = startDate
+
+                ' Find all the dates for the selected day of the week
+                Do While currentDate <= endDate
+                    If Format(currentDate, "ddd") = Choose(i, "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun") Then
+                        ' Place the date in the next available cell in column J
+                        ws.Cells(outputRow, 10 + dateCounter).Value = Format(currentDate, "mm/dd/yyyy")
+                        dateCounter = dateCounter + 1 ' Move to the next cell in column J
+                    End If
+                    currentDate = currentDate + 1
+                Loop
+            End If
+        Next i
+    Next cell
+End Sub
+
+
