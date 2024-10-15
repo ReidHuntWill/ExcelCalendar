@@ -1,0 +1,87 @@
+Sub ScheduleSummary()
+    Dim wsSource As Worksheet
+    Dim wsTarget As Worksheet
+    Dim lastRow As Long
+    Dim nameRange As Range
+    Dim dateRange As Range
+    Dim cell As Range
+    Dim dict As Object
+    Dim name As Variant
+    Dim i As Long
+    Dim j As Long
+
+    ' Set the source worksheet
+    Set wsSource = ThisWorkbook.Sheets("NextMonthCalendar")
+
+    ' Create or clear the target worksheet
+    On Error Resume Next
+    Set wsTarget = ThisWorkbook.Sheets("Summary")
+    On Error GoTo 0
+    
+    If wsTarget Is Nothing Then
+        Set wsTarget = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.count))
+        wsTarget.name = "Summary"
+    Else
+        wsTarget.Cells.Clear
+    End If
+
+    ' Initialize dictionary to store name and their schedules
+    Set dict = CreateObject("Scripting.Dictionary")
+
+    ' Find the last row with data in column A
+    lastRow = wsSource.Cells(wsSource.Rows.count, 1).End(xlUp).Row
+
+    ' Loop through each row to extract names and dates
+    For i = 2 To lastRow ' Assuming row 1 has headers
+        Set dateRange = wsSource.Cells(i, 1)
+        
+        For j = 2 To 4 ' Columns B, C, D
+            Set nameRange = wsSource.Cells(i, j)
+            
+            If Not IsEmpty(nameRange.Value) Then
+                name = nameRange.Value
+                
+                If Not dict.Exists(name) Then
+                    dict.Add name, New Collection
+                End If
+                
+                dict(name).Add dateRange.Value
+            End If
+        Next j
+    Next i
+
+    ' Output the results to the target worksheet
+    wsTarget.Cells(1, 1).Value = "Name"
+    wsTarget.Cells(1, 2).Value = "Count"
+    wsTarget.Cells(1, 3).Value = "Dates"
+    
+    i = 2
+    For Each name In dict.Keys
+        wsTarget.Cells(i, 1).Value = name
+        wsTarget.Cells(i, 2).Value = dict(name).count
+        
+        ' Create a string with all dates
+        Dim dateList As String
+        dateList = ""
+        For Each dateItem In dict(name)
+            If Len(dateList) > 0 Then dateList = dateList & ", "
+            dateList = dateList & Format(dateItem, "mm/dd/yyyy")
+        Next dateItem
+        wsTarget.Cells(i, 3).Value = dateList
+        
+        i = i + 1
+    Next name
+
+    ' Sort the data alphabetically by Name (column A)
+    With wsTarget
+        .Range("A1:C" & wsTarget.Cells(wsTarget.Rows.count, "A").End(xlUp).Row).Sort _
+            Key1:=.Range("A2"), Order1:=xlAscending, header:=xlYes
+    End With
+
+    ' Auto-fit columns for better visibility
+    wsTarget.Columns.AutoFit
+
+    MsgBox "Summary created and sorted successfully!"
+End Sub
+
+
