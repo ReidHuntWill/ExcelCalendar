@@ -1,0 +1,50 @@
+Sub SetupWorksheet()
+    Dim ws As Worksheet
+    Dim rng As Range
+    Dim i As Integer
+    Dim days As Variant
+    Dim checkbox As checkbox
+    Dim header As Variant
+    
+    ' Create a new worksheet or use the existing one
+    Set ws = ThisWorkbook.Worksheets.Add
+    ws.name = "Weekly Schedule" ' You can change this name if needed
+
+    ' Define the headers
+    header = Array("Name", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    
+    ' Set headers in Row 1
+    For i = LBound(header) To UBound(header)
+        ws.Cells(1, i + 1).Value = header(i)
+    Next i
+
+    ' Define the range for names
+    Set rng = ws.Range("A2:A50") ' Adjust the range as needed for your names
+    
+    ' Create checkboxes for days of the week
+    For i = 0 To 6 ' 0 = Mon, 6 = Sun
+        For Each cell In rng
+            Set checkbox = ws.CheckBoxes.Add( _
+                cell.Offset(0, i + 1).Left, _
+                cell.Offset(0, i + 1).Top, _
+                cell.Offset(0, i + 1).Width, _
+                cell.Offset(0, i + 1).Height)
+                
+            With checkbox
+                .Caption = "" ' No caption for checkbox
+                .LinkedCell = cell.Offset(0, i + 1).Address ' Link to the corresponding cell
+                .name = "chk_" & cell.Address & "_" & i ' Unique name for each checkbox
+                .Value = 0 ' Uncheck by default
+            End With
+        Next cell
+    Next i
+
+    ' Autofit columns for better visibility
+    ws.Columns("A:H").AutoFit
+
+    MsgBox "Setup Complete! Please enter names in Column A."
+End Sub
+
+
+
+
