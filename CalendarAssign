@@ -1,0 +1,196 @@
+Sub AssignNamesToCalendar()
+    Dim wsTeams As Worksheet
+    Dim wsCalendar As Worksheet
+    Dim wsUnavailable As Worksheet
+    Dim names As Variant
+    Dim unavailableData As Variant
+    Dim nextMonth As Integer
+    Dim nextYear As Integer
+    Dim startDate As Date
+    Dim endDate As Date
+    Dim i As Integer
+    Dim j As Integer
+    Dim k As Integer
+    Dim sheetExists As Boolean
+    Dim ws As Worksheet
+    Dim dictUnavailable As Object
+    Dim agent As String
+    Dim availableAgents As Collection
+    Dim agentsCount As Integer
+    Dim assignedShifts As Object
+    Dim shift As Variant ' Declare shift as a Variant
+
+    ' Display a confirmation message box
+    Dim response As VbMsgBoxResult
+    response = MsgBox("Do you want to run this macro to assign names to the Next Month calendar?", vbYesNo + vbQuestion, "Run Macro")
+
+    If response = vbNo Then
+        MsgBox "Macro execution canceled."
+        Exit Sub
+    End If
+
+    On Error GoTo ErrorHandler
+
+    ' Set worksheets
+    Set wsTeams = ThisWorkbook.Sheets("available")
+    Set wsUnavailable = ThisWorkbook.Sheets("unavailable")
+
+    ' Check if "NextMonthCalendar" sheet exists
+    sheetExists = False
+    For Each ws In ThisWorkbook.Sheets
+        If ws.name = "NextMonthCalendar" Then
+            sheetExists = True
+            Set wsCalendar = ws
+            Exit For
+        End If
+    Next ws
+
+    If Not sheetExists Then
+        Set wsCalendar = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.count))
+        wsCalendar.name = "NextMonthCalendar"
+    Else
+        wsCalendar.Cells.Clear
+    End If
+
+    ' Output headers
+    wsCalendar.Cells(1, 1).Value = "Date"
+    wsCalendar.Cells(1, 2).Value = "9 AM Agent"
+    wsCalendar.Cells(1, 3).Value = "11:30 AM Agent"
+    wsCalendar.Cells(1, 4).Value = "2 PM Agent"
+
+    ' Get list of names from the "available" sheet
+    Dim lastRow As Long
+    lastRow = wsTeams.Cells(wsTeams.Rows.count, "A").End(xlUp).Row
+    names = wsTeams.Range("A2:A" & lastRow).Value
+
+    ' Get unavailable data
+    unavailableData = wsUnavailable.Range("A2:C" & wsUnavailable.Cells(wsUnavailable.Rows.count, "A").End(xlUp).Row).Value
+
+    ' Initialize dictionary for unavailable dates
+    Set dictUnavailable = CreateObject("Scripting.Dictionary")
+    For i = LBound(unavailableData, 1) To UBound(unavailableData, 1)
+        Dim currentDate As Date
+        Dim shiftString As String
+        
+        currentDate = unavailableData(i, 2)
+        shiftString = Trim(unavailableData(i, 3))
+        agent = unavailableData(i, 1)
+        
+        If Not dictUnavailable.Exists(currentDate) Then
+            dictUnavailable.Add currentDate, CreateObject("Scripting.Dictionary")
+        End If
+        
+        If shiftString = "" Then
+            dictUnavailable(currentDate).Add agent, "All"
+        Else
+            dictUnavailable(currentDate).Add agent, shiftString
+        End If
+    Next i
+
+    ' Determine the next month and year
+    If Month(Date) = 12 Then
+        nextMonth = 1
+        nextYear = Year(Date) + 1
+    Else
+        nextMonth = Month(Date) + 1
+        nextYear = Year(Date)
+    End If
+
+    ' Set the start and end dates for the next month
+    startDate = DateSerial(nextYear, nextMonth, 1)
+    endDate = DateSerial(nextYear, nextMonth + 1, 0)
+
+    ' Initialize agents list
+    Dim agentsList As Collection
+    Set agentsList = New Collection
+    For i = LBound(names, 1) To UBound(names, 1)
+        agentsList.Add names(i, 1)
+    Next i
+
+    ' Handle edge case for insufficient agents
+    agentsCount = agentsList.count
+    If agentsCount < 3 Then
+        MsgBox "Not enough agents available to assign to the calendar."
+        Exit Sub
+    End If
+
+    ' Initialize assigned shifts dictionary
+    Set assignedShifts = CreateObject("Scripting.Dictionary")
+    For i = 1 To agentsCount
+        assignedShifts.Add agentsList.Item(i), 0
+    Next i
+
+    ' Assign names to each day of the month
+    i = 2 ' Start from the second row (below headers)
+    For j = 0 To endDate - startDate
+        wsCalendar.Cells(i, 1).Value = startDate + j
+        
+        ' Fill shifts for the day
+        For Each shift In Array("9 AM", "11:30 AM", "2 PM")
+            Set availableAgents = New Collection
+            
+            ' Populate available agents for the current shift
+            For k = 1 To agentsList.count
+                agent = agentsList.Item(k)
+                If assignedShifts(agent) < (3 * (endDate - startDate + 1) / agentsCount) Then
+                    If Not IsAgentUnavailable(agent, startDate + j, dictUnavailable, CStr(shift)) Then ' Convert shift to String
+                        availableAgents.Add agent
+                    End If
+                End If
+            Next k
+            
+            ' Assign shift
+            If availableAgents.count > 0 Then
+                ' Randomly select an agent from available agents
+                randomIndex = Int(availableAgents.count * Rnd) + 1
+                agent = availableAgents.Item(randomIndex)
+                wsCalendar.Cells(i, GetShiftColumn(CStr(shift))).Value = agent ' Convert shift to String
+                assignedShifts(agent) = assignedShifts(agent) + 1
+            Else
+                wsCalendar.Cells(i, GetShiftColumn(CStr(shift))).Value = "No available agent"
+            End If
+        Next shift
+        
+        i = i + 1
+    Next j
+
+    ' Autofit columns
+    wsCalendar.Columns("A:D").AutoFit
+
+    MsgBox "Names have been successfully assigned to the calendar!"
+
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "An error occurred: " & Err.Description & " (Error " & Err.Number & ")"
+    Application.ScreenUpdating = True
+    Resume Next
+End Sub
+
+Function GetShiftColumn(shift As String) As Integer
+    Select Case shift
+        Case "9 AM": GetShiftColumn = 2
+        Case "11:30 AM": GetShiftColumn = 3
+        Case "2 PM": GetShiftColumn = 4
+        Case Else: GetShiftColumn = -1
+    End Select
+End Function
+
+' Function to check if an agent is unavailable for a specific shift on a specific date
+Function IsAgentUnavailable(agent As String, checkDate As Date, dict As Object, shift As String) As Boolean
+    Dim agentDict As Object
+    
+    If dict.Exists(checkDate) Then
+        Set agentDict = dict(checkDate)
+        If agentDict.Exists(agent) Then
+            If agentDict(agent) = "All" Or agentDict(agent) = shift Then
+                IsAgentUnavailable = True
+                Exit Function
+            End If
+        End If
+    End If
+    
+    IsAgentUnavailable = False
+End Function
+
+
