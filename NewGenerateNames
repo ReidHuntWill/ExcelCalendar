@@ -1,0 +1,138 @@
+Sub CreateNextMonthCalendar_WithStrictPreferences()
+    Dim wsSource As Worksheet
+    Dim wsCalendar As Worksheet
+    Dim wsPreferred As Worksheet
+    Dim lastRowSource As Long
+    Dim lastRowPreferred As Long
+    Dim agentList() As String
+    Dim agentCount As Object
+    Dim assignedAgent1 As String, assignedAgent2 As String
+    Dim i As Long, j As Long
+    Dim dateVal As Date
+    Dim previousAgents As Object ' Dictionary for back-to-back check
+    Dim rng As Range
+    Dim temp As Variant
+    Dim agent As Variant
+    Dim validAgents As Collection
+    Dim preferredShift As Object ' Dictionary to store preferred shifts
+    Dim agentName As String
+    Dim shift As String
+    
+    ' Set the source worksheets
+    Set wsSource = ThisWorkbook.Sheets("AvailabilitySummary")
+    Set wsPreferred = ThisWorkbook.Sheets("Preferred")
+    
+    ' Create a new sheet for NextMonthCalendar if it doesn't exist
+    On Error Resume Next
+    Set wsCalendar = ThisWorkbook.Sheets("NextMonthCalendar")
+    If wsCalendar Is Nothing Then
+        Set wsCalendar = ThisWorkbook.Sheets.Add
+        wsCalendar.name = "NextMonthCalendar"
+    End If
+    On Error GoTo 0
+    
+    ' Initialize the headers for the NextMonthCalendar sheet
+    wsCalendar.Cells(1, 1).Value = "Date"
+    wsCalendar.Cells(1, 2).Value = "9 AM Agent"
+    wsCalendar.Cells(1, 3).Value = "1:00 PM Agent"
+    
+    ' Find the last row in the AvailabilitySummary and Preferred tabs
+    lastRowSource = wsSource.Cells(wsSource.Rows.count, "A").End(xlUp).Row
+    lastRowPreferred = wsPreferred.Cells(wsPreferred.Rows.count, "A").End(xlUp).Row
+    
+    ' Initialize a dictionary to track how many times each agent has been assigned
+    Set agentCount = CreateObject("Scripting.Dictionary")
+    
+    ' Initialize a dictionary to store previous day's agents for back-to-back check
+    Set previousAgents = CreateObject("Scripting.Dictionary")
+    
+    ' Initialize a dictionary for storing preferred shifts
+    Set preferredShift = CreateObject("Scripting.Dictionary")
+    
+    ' Populate the preferredShift dictionary from the "Preferred" sheet
+    For i = 2 To lastRowPreferred
+        agentName = wsPreferred.Cells(i, 1).Value
+        shift = wsPreferred.Cells(i, 2).Value
+        If Not preferredShift.Exists(agentName) Then
+            preferredShift.Add agentName, shift
+        End If
+    Next i
+    
+    ' Loop through each row in the AvailabilitySummary (dates)
+    For i = 2 To lastRowSource
+        dateVal = wsSource.Cells(i, 1).Value ' Get the date from column A
+        Set rng = wsSource.Cells(i, 2).Resize(1, wsSource.Cells(i, Columns.count).End(xlToLeft).Column - 1) ' Get the range of agents
+        
+        ' Create a collection to store valid agents (non-empty)
+        Set validAgents = New Collection
+        
+        ' Loop through the cells and add non-empty values to validAgents
+        temp = rng.Value
+        For Each agent In temp
+            If Len(agent) > 0 Then
+                validAgents.Add agent
+            End If
+        Next agent
+        
+        ' Convert validAgents collection to a string array for random selection
+        ReDim agentList(1 To validAgents.count)
+        For j = 1 To validAgents.count
+            agentList(j) = validAgents(j)
+        Next j
+        
+        ' Initialize assigned agents
+        assignedAgent1 = ""
+        assignedAgent2 = ""
+        
+        ' First, try to assign agents based on their strict preferred shifts
+        For j = LBound(agentList) To UBound(agentList)
+            If preferredShift.Exists(agentList(j)) Then
+                If preferredShift(agentList(j)) = "9:00 AM" And assignedAgent1 = "" Then
+                    assignedAgent1 = agentList(j)
+                ElseIf preferredShift(agentList(j)) = "1:00 PM" And assignedAgent2 = "" Then
+                    assignedAgent2 = agentList(j)
+                End If
+            End If
+        Next j
+        
+        ' Randomly assign the remaining agents if slots are still open (only to available slots)
+        If assignedAgent1 = "" Then
+            Dim randomIndex1 As Long
+            Do
+                randomIndex1 = Int((UBound(agentList) - LBound(agentList) + 1) * Rnd + LBound(agentList))
+            Loop While previousAgents.Exists(agentList(randomIndex1))
+            assignedAgent1 = agentList(randomIndex1)
+        End If
+        
+        If assignedAgent2 = "" Then
+            Dim randomIndex2 As Long
+            Do
+                randomIndex2 = Int((UBound(agentList) - LBound(agentList) + 1) * Rnd + LBound(agentList))
+            Loop While randomIndex1 = randomIndex2 Or previousAgents.Exists(agentList(randomIndex2))
+            assignedAgent2 = agentList(randomIndex2)
+        End If
+        
+        ' Update the agent assignment counts in agentCount dictionary
+        If Not agentCount.Exists(assignedAgent1) Then agentCount.Add assignedAgent1, 0
+        If Not agentCount.Exists(assignedAgent2) Then agentCount.Add assignedAgent2, 0
+        
+        agentCount(assignedAgent1) = agentCount(assignedAgent1) + 1
+        agentCount(assignedAgent2) = agentCount(assignedAgent2) + 1
+        
+        ' Write the date and agent names to the NextMonthCalendar sheet
+        wsCalendar.Cells(i, 1).Value = dateVal ' Date in column A
+        wsCalendar.Cells(i, 2).Value = assignedAgent1 ' 9 AM Agent in column B
+        wsCalendar.Cells(i, 3).Value = assignedAgent2 ' 11:30 AM Agent in column C
+        
+        ' Clear previous agents collection and add new agents for back-to-back check
+        previousAgents.RemoveAll ' Clear all previous agents
+        If assignedAgent1 <> "N/A" Then previousAgents.Add assignedAgent1, True
+        If assignedAgent2 <> "N/A" Then previousAgents.Add assignedAgent2, True
+    Next i
+    
+    ' Auto-fit the columns
+    wsCalendar.Columns("A:C").AutoFit
+    
+    MsgBox "NextMonthCalendar created successfully with strict preferences!", vbInformation
+End Sub
+
