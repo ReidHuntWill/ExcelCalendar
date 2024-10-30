@@ -1,0 +1,98 @@
+Sub FillAvailableDatesForCurrentMonth()
+    Dim ws As Worksheet
+    Dim wsNew As Worksheet
+    Dim lastRow As Long
+    Dim agentDict As Object
+    Dim agentName As Variant
+    Dim currentDate As Date
+    Dim endDate As Date
+    Dim firstDateThisMonth As Date
+    Dim lastDateThisMonth As Date
+    Dim dateCol As Range
+    Dim dateArray() As Date
+    Dim foundDate As Boolean
+    Dim i As Long, j As Long
+    Dim agentKeys As Variant ' Variable to hold dictionary keys
+    Dim wsName As String
+
+    ' Set the name of the new sheet
+    wsName = "AvailableDates"
+    
+    ' Check if the worksheet "AvailableDates" already exists and delete it if it does
+    On Error Resume Next
+    Set wsNew = ThisWorkbook.Sheets(wsName)
+    On Error GoTo 0
+    If Not wsNew Is Nothing Then
+        Application.DisplayAlerts = False
+        wsNew.Delete
+        Application.DisplayAlerts = True
+    End If
+
+    ' Set reference to the current worksheet
+    Set ws = ThisWorkbook.Sheets("unavailable") ' Replace with your sheet name
+    lastRow = ws.Cells(ws.Rows.count, "A").End(xlUp).Row ' Find the last row with data
+    
+    ' Create a dictionary to hold dates for each agent
+    Set agentDict = CreateObject("Scripting.Dictionary")
+    
+    ' Collect dates for each agent, checking for duplicates
+    For i = 2 To lastRow ' Assuming row 1 is header
+        agentName = ws.Cells(i, 1).Value
+        currentDate = ws.Cells(i, 2).Value ' Column B contains the date
+        
+        ' If agent does not exist in the dictionary, create a new dictionary for their dates
+        If Not agentDict.Exists(agentName) Then
+            Set agentDict(agentName) = CreateObject("Scripting.Dictionary")
+        End If
+        
+        ' Only add the date if it does not already exist for this agent
+        If Not agentDict(agentName).Exists(currentDate) Then
+            agentDict(agentName).Add currentDate, True
+        End If
+    Next i
+
+    ' Get the latest date in the dataset and calculate the first and last date of the same month
+    Set dateCol = ws.Range("B2:B" & lastRow)
+    endDate = Application.WorksheetFunction.Max(dateCol)
+    firstDateThisMonth = DateSerial(Year(endDate), Month(endDate), 1)
+    lastDateThisMonth = DateSerial(Year(endDate), Month(endDate) + 1, 0) ' Correct calculation to stay in current month
+
+    ' Add a new worksheet to store the available dates for all agents
+    Set wsNew = ThisWorkbook.Sheets.Add
+    wsNew.name = wsName
+
+    ' Write header in the new worksheet
+    wsNew.Cells(1, 1).Value = "Agent"
+    wsNew.Cells(1, 2).Value = "Available Date"
+
+    ' Get all agent keys (names)
+    agentKeys = agentDict.Keys
+
+    ' Initialize row counter for the new sheet
+    j = 2 ' Start at row 2 (row 1 is header)
+
+    ' Loop through each agent
+    For Each agentName In agentKeys
+        ' Initialize date array to hold all dates from the current month
+        ReDim dateArray(0 To DateDiff("d", firstDateThisMonth, lastDateThisMonth))
+        For i = 0 To UBound(dateArray)
+            dateArray(i) = firstDateThisMonth + i
+        Next i
+
+        ' Check which dates in the current month are missing
+        For i = 0 To UBound(dateArray)
+            currentDate = dateArray(i)
+            foundDate = agentDict(agentName).Exists(currentDate)
+
+            ' If the date is not found for the agent, add it to the new sheet
+            If Not foundDate Then
+                wsNew.Cells(j, 1).Value = agentName
+                wsNew.Cells(j, 2).Value = currentDate
+                j = j + 1
+            End If
+        Next i
+    Next agentName
+
+    MsgBox "Available dates for this month have been added to the 'AvailableDates' sheet!"
+End Sub
+
