@@ -1,0 +1,40 @@
+Sub AppendUnavailableDates()
+    Dim wsSource As Worksheet
+    Dim wsUnavailable As Worksheet
+    Dim lastRow As Long
+    Dim lastUnavailableRow As Long
+    Dim i As Long, j As Long
+    Dim name As String
+    Dim dateValue As Variant
+
+    ' Set your source worksheet and the unavailable worksheet
+    Set wsSource = ThisWorkbook.Sheets("Weekly Schedule")
+    Set wsUnavailable = ThisWorkbook.Sheets("unavailable")
+
+    ' Get the last row in column A
+    lastRow = wsSource.Cells(wsSource.Rows.count, "A").End(xlUp).Row
+
+    ' Loop through each name in column A
+    For i = 1 To lastRow ' Change to 2 if there's a header in row 1
+        name = wsSource.Cells(i, 1).Value
+
+        ' Check each cell from J to AA in the current row
+        For j = 10 To 50 ' J=10, AA=27
+            dateValue = wsSource.Cells(i, j).Value
+
+            ' Check if the cell contains a date
+            If IsDate(dateValue) Then
+                ' Find the last row in the unavailable sheet
+                lastUnavailableRow = wsUnavailable.Cells(wsUnavailable.Rows.count, "A").End(xlUp).Row + 1
+                
+                ' Append the name and date to the unavailable sheet
+                wsUnavailable.Cells(lastUnavailableRow, 1).Value = name
+                wsUnavailable.Cells(lastUnavailableRow, 2).Value = dateValue
+            End If
+        Next j
+    Next i
+    
+    MsgBox "Dates appended to 'unavailable' sheet."
+End Sub
+
+
